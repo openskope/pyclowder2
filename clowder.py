@@ -3,6 +3,8 @@ import os
 import argparse
 import json
 import requests
+import sys
+from pprint import pprint
 from pyclowder.clowder import Clowder
 
 
@@ -25,28 +27,80 @@ def dataset_delete(args, clowder):
 
 def file_list(args, clowder):
 
-    dataset_id = get_dataset_id(args.dataset_name)
-    file_list = get_file_list(None, host, key, dataset_id)
+    file_list = clowder.list_file(args.dataset_name)
+    #print(file_list)
     for f in file_list:
         print(f['filename'])
 
 
 def file_add(args, clowder):
 
-    dataset_id = clowder.get_dataset_id(args.dataset_name)
-    if args.local is not None:
-        pass
+    if not args.local:
+        clowder.add_file(args.dataset_name, args.file_name)
     else:
-        upload_to_dataset(None, host, key, dataset_id,
-                          args.file_name, True)
+        pass
 
 
 def file_delete(args, clowder):
 
-    dataset_id = clowder.get_dataset_id(args.dataset_name)
-    file_id = get_file_id(dataset_id, args.file_name)
-    requests.delete(API + 'datasets/' + dataset_id + '/' +\
-                    file_id + '?key=' + key)
+    clowder.delete_file(args.dataset_name, args.file_name)
+
+
+def dataset_metadata_list(args, clowder):
+
+    metadata = clowder.list_dataset_metadata(args.dataset_name)
+
+    pprint(metadata)
+
+
+def dataset_metadata_add(args, clowder):
+
+    metadata = {
+        '@context':['https://clowder.ncsa.illinois.edu/contexts/metadata.jsonld'],
+        'agent':{'@type':'cat:user',
+                 'user_id':''},
+        'content':{},
+    }
+    for meta_str in args.meta_strs:
+        key_value = meta_str.split('=')
+        metadata['content'][key_value[0]]=key_value[1]
+
+    clowder.add_dataset_metadata(args.dataset_name, metadata)
+
+
+def dataset_metadata_delete(args, clowder):
+
+    clowder.delete_dataset_metadata(args.dataset_name)
+
+
+def file_metadata_list(args, clowder):
+
+    metadata = clowder.list_file_metadata(args.dataset_name,
+                                          args.file_name)
+
+    pprint(metadata)
+
+
+def file_metadata_add(args, clowder):
+
+    metadata = {
+        '@context':['https://clowder.ncsa.illinois.edu/contexts/metadata.jsonld'],
+        'agent':{'@type':'cat:user',
+                 'user_id':''},
+        'content':{},
+    }
+    for meta_str in args.meta_strs:
+        key_value = meta_str.split('=')
+        metadata['content'][key_value[0]]=key_value[1]
+
+    clowder.add_file_metadata(args.dataset_name, 
+                              args.file_name, metadata)
+
+
+def file_metadata_delete(args, clowder):
+
+    clowder.delete_file_metadata(args.dataset_name,
+                                 args.file_name)
 
 
 def setup_commands(parser):
@@ -79,6 +133,23 @@ def setup_commands(parser):
     subcmd.add_argument('dataset_name', type=str)
     subcmd.set_defaults(func=dataset_delete)
 
+    #dataset metadata
+    metadata = subp.add_parser('metadata')
+    metadata_ops = metadata.add_subparsers()
+
+    subcmd = metadata_ops.add_parser('list')
+    subcmd.add_argument('dataset_name', type=str)
+    subcmd.set_defaults(func=dataset_metadata_list)
+
+    subcmd = metadata_ops.add_parser('add')
+    subcmd.add_argument('dataset_name', type=str)
+    subcmd.add_argument('meta_strs', type=str, nargs='*')
+    subcmd.set_defaults(func=dataset_metadata_add)
+
+    subcmd = metadata_ops.add_parser('delete')
+    subcmd.add_argument('dataset_name', type=str)
+    subcmd.set_defaults(func=dataset_metadata_delete)
+
     #file
     File = subparsers.add_parser('file')
     subp = File.add_subparsers()
@@ -98,6 +169,38 @@ def setup_commands(parser):
     subcmd.add_argument('file_name', type=str)
     subcmd.set_defaults(func=file_delete)
 
+    #file metadata
+    metadata = subp.add_parser('metadata')
+    metadata_ops = metadata.add_subparsers()
+
+    subcmd = metadata_ops.add_parser('list')
+    subcmd.add_argument('dataset_name', type=str)
+    subcmd.add_argument('file_name', type=str)
+    subcmd.set_defaults(func=file_metadata_list)
+
+    subcmd = metadata_ops.add_parser('add')
+    subcmd.add_argument('dataset_name', type=str)
+    subcmd.add_argument('file_name', type=str)
+    subcmd.add_argument('meta_strs', type=str, nargs='*')
+    subcmd.set_defaults(func=file_metadata_add)
+
+    subcmd = metadata_ops.add_parser('delete')
+    subcmd.add_argument('dataset_name', type=str)
+    subcmd.add_argument('file_name', type=str)
+    subcmd.set_defaults(func=file_metadata_delete)
+
+
+def args_operation(args, clowder):
+
+    try:
+        args.func(args, clowder)
+    except requests.exceptions.HTTPError as e:
+        status = e.response.status_code
+        if status==401:
+            sys.stderr.write('Operation not authorized. Your username' +
+                              ' or password might be wrong or you have' +
+                              ' no right on the file.\n')
+
 
 def main():
 
@@ -106,8 +209,8 @@ def main():
     args = parser.parse_args()
 
     clowder = Clowder(url=args.url, auth=(args.login, args.password))
-    args.func(args, clowder)
-    
+    args_operation(args, clowder)
+
         
 if __name__ == '__main__':
     main()

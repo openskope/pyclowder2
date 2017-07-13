@@ -1,6 +1,7 @@
 import os
 import requests
-from files import get_file_list
+import sys
+from datasets import get_file_list
 
 
 class Clowder(object):
@@ -33,10 +34,15 @@ class Clowder(object):
         return r
     
     
-    def _post(self, endpoint, data):
+    def _post(self, endpoint, data, files=None):
     
-        r = requests.post(self._api(endpoint), auth=self.auth, json=data, 
-                verify=self.verify)
+        if files:
+            r = requests.post(self._api(endpoint), auth=self.auth,
+                files=files, verify=self.verify)
+        else:
+            r = requests.post(self._api(endpoint), auth=self.auth,
+                json=data, verify=self.verify)
+
         r.raise_for_status()
     
         return r
@@ -62,23 +68,35 @@ class Clowder(object):
 
     def get_dataset_id(self, dataset_name):
 
-        dataset_list = requests.get(os.environ.get\
-                                    ('CLOWDER_API_BASE')\
-                                    + 'datasets').json()
-        for data in dataset_list:
-            if data['name']==dataset_name:
-                dataset_id = data['id']
+        dataset_list = self._get('datasets').json()
+        for dataset in dataset_list:
+            if dataset['name']==dataset_name:
+                dataset_id = dataset['id']
 
         return dataset_id
 
 
     def get_file_id(self, dataset_id, file_name):
-        file_list = get_file_list(None, host, key, dataset_id)
+
+        file_list = self._get('datasets/{}/listFiles'.format\
+                              (dataset_id)).json()
         for f in file_list:
             if f['filename']==file_name:
                 file_id = f['id']
 
         return file_id
+
+
+    def get_user_id(self, dataset_name):
+
+        dataset_list = self._get('datasets').json()
+
+        for dataset in dataset_list:
+            if dataset['name']==dataset_name:
+                user_id = 'http://141.142.170.103/api/users/{}'.\
+                          format(dataset['authorId'])
+
+        return user_id
 
 
     def list_datasets(self):
@@ -96,6 +114,12 @@ class Clowder(object):
             payload['spaceid'] = spaceid
     
         # TODO
+        dataset_list = self.list_datasets()
+        dataname_list = [dataset['name'] for dataset in dataset_list]
+        if name in dataname_list:
+            sys.stderr.write('Dataset name already existed.\n')
+            return
+
         if filenames:
             pass
     
@@ -116,16 +140,97 @@ class Clowder(object):
          
         # count the number datasets with name and delete if there is only one
         count = ids.values().count(name)
+
         if count == 1:
             self.delete_dataset(ids.keys()[ids.values().index(name)])
 
         elif count > 1:
-            raise RuntimeError('dataset {} found more than once'.format(name))
+            sys.stderr.write('dataset {} found more than once\n'.format(name))
     
         else:
-            raise RuntimeError('dataset {} not found'.format(name))
+            sys.stderr.write('dataset {} not found\n'.format(name))
     
-    
-    def add_dataset_metadata(dataset, metadata):
-    
-        return get('datasets/{}'.format(dataset)).json()
+
+    def list_dataset_metadata(self, dataset_name):
+
+        dataset_id = self.get_dataset_id(dataset_name)
+
+        metadata = self._get('datasets/{}/metadata.jsonld'.format(dataset_id))
+
+        return metadata.json()
+
+   
+    def add_dataset_metadata(self, dataset_name, metadata):
+
+        dataset_id = self.get_dataset_id(dataset_name)
+
+        metadata['agent']['user_id'] = self.get_user_id(dataset_name)
+
+        r = self._post('datasets/{}/metadata.jsonld'.format(dataset_id),
+                   metadata)
+        print('uploaded')
+
+
+    def delete_dataset_metadata(self, dataset_name):
+
+        dataset_id = self.get_dataset_id(dataset_name)
+
+        r = self._delete('datasets/{}/metadata.jsonld'.format(dataset_id))
+
+        r.raise_for_status()
+
+
+    def list_file(self, dataset_name):
+
+        dataset_id = self.get_dataset_id(dataset_name)
+        file_list = self._get('datasets/{}/listFiles'.format(dataset_id))
+        
+        return file_list.json()
+
+
+    def add_file(self, dataset_name, file_path):
+
+        data = {'name': file_path}
+        dataset_id = self.get_dataset_id(dataset_name)
+        files = {'File': open(file_path, 'rb')}
+        r = self._post('uploadToDataset/{}'.format(dataset_id), data, files)
+
+
+    def delete_file(self, dataset_name, file_name):
+
+        dataset_id = self.get_dataset_id(dataset_name)
+        file_id = self.get_file_id(dataset_id, file_name)
+
+        r = self._delete('datasets/{}/{}'.format(dataset_id, file_id))
+
+
+    def list_file_metadata(self, dataset_name, file_name):
+
+         dataset_id = self.get_dataset_id(dataset_name)
+         file_id = self.get_file_id(dataset_id, file_name)
+
+         metadata = self._get('files/{}/metadata.jsonld'.format(file_id))
+
+         return metadata.json()
+
+
+    def add_file_metadata(self, dataset_name, file_name, metadata):
+
+        dataset_id = self.get_dataset_id(dataset_name)
+        file_id = self.get_file_id(dataset_id, file_name)
+
+        metadata['agent']['user_id'] = self.get_user_id(dataset_name)
+
+        r = self._post('files/{}/metadata.jsonld'.format(file_id),
+                       metadata) 
+        print('uploaded')
+
+
+    def delete_file_metadata(self, dataset_name, file_name):
+
+        dataset_id = self.get_dataset_id(dataset_name)
+        file_id = self.get_file_id(dataset_id, file_name)
+
+        r = self._delete('files/{}/metadata.jsonld'.format(file_id))
+
+        r.raise_for_status()
