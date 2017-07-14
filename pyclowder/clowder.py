@@ -149,6 +149,29 @@ class Clowder(object):
     
         else:
             sys.stderr.write('dataset {} not found\n'.format(name))
+
+
+    def show_dataset(self, dataset_name):
+
+        dataset_list = self.list_datasets()
+        for dataset in dataset_list:
+            if dataset['name']==dataset_name:
+                authorId = dataset['authorId']
+                description =dataset['description']
+
+        author_info = self._get('users/{}'.format(authorId)).json()
+        author_name = author_info['fullName']
+
+        metadata = self.list_dataset_metadata(dataset_name)
+
+        print('Dataset name: {}'.format(dataset_name))
+        print('Description: {}'.format(description))
+        print('Author: {}'.format(author_name))
+        print('\nMetadata----')
+        for data in metadata:
+            d = data['content'].items()
+            for key,value in d:
+                print('{}: {}'.format(key,value))
     
 
     def list_dataset_metadata(self, dataset_name):
@@ -202,6 +225,29 @@ class Clowder(object):
         file_id = self.get_file_id(dataset_id, file_name)
 
         r = self._delete('datasets/{}/{}'.format(dataset_id, file_id))
+
+
+    def show_file(self, dataset_name, file_name):
+
+        dataset_id = self.get_dataset_id(dataset_name)
+        file_id = self.get_file_id(dataset_id, file_name)
+        file_info = self._get('files/{}/metadata'.format(file_id)).json()
+
+        authorId = file_info['authorId']
+        author_info = self._get('users/{}'.format(authorId)).json()
+        author_name = author_info['fullName']
+        description = file_info['filedescription']
+
+        metadata = self.list_file_metadata(dataset_name, file_name)
+
+        print('Dataset name: {}'.format(file_name))
+        print('Description: {}'.format(description))
+        print('Author: {}'.format(author_name))
+        print('\nMetadata----')
+        for data in metadata:
+            d = data['content'].items()
+            for key,value in d:
+                print('{}: {}'.format(key,value))
 
 
     def list_file_metadata(self, dataset_name, file_name):

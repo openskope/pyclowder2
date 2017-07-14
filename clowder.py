@@ -25,6 +25,11 @@ def dataset_delete(args, clowder):
     clowder.delete_dataset_name(args.dataset_name)
 
 
+def dataset_show(args, clowder):
+
+    clowder.show_dataset(args.dataset_name)
+
+
 def file_list(args, clowder):
 
     file_list = clowder.list_file(args.dataset_name)
@@ -46,11 +51,22 @@ def file_delete(args, clowder):
     clowder.delete_file(args.dataset_name, args.file_name)
 
 
+def file_show(args, clowder):
+
+    clowder.show_file(args.dataset_name, args.file_name)
+
+
 def dataset_metadata_list(args, clowder):
 
     metadata = clowder.list_dataset_metadata(args.dataset_name)
 
-    pprint(metadata)
+    if args.json:
+        print(json.dumps(metadata))
+    else:
+        for data in metadata:
+            d = data['content'].items()
+            for key,value in d:
+                print('{}: {}'.format(key,value))
 
 
 def dataset_metadata_add(args, clowder):
@@ -78,7 +94,13 @@ def file_metadata_list(args, clowder):
     metadata = clowder.list_file_metadata(args.dataset_name,
                                           args.file_name)
 
-    pprint(metadata)
+    if args.json:
+        print(json.dumps(metadata))
+    else:
+        for data in metadata:
+            d = data['content'].items()
+            for key,value in d:
+                print('{}: {}'.format(key,value))
 
 
 def file_metadata_add(args, clowder):
@@ -133,11 +155,16 @@ def setup_commands(parser):
     subcmd.add_argument('dataset_name', type=str)
     subcmd.set_defaults(func=dataset_delete)
 
+    subcmd = subp.add_parser('show')
+    subcmd.add_argument('dataset_name', type=str)
+    subcmd.set_defaults(func=dataset_show)
+
     #dataset metadata
     metadata = subp.add_parser('metadata')
     metadata_ops = metadata.add_subparsers()
 
     subcmd = metadata_ops.add_parser('list')
+    subcmd.add_argument('--json', action='store_true')
     subcmd.add_argument('dataset_name', type=str)
     subcmd.set_defaults(func=dataset_metadata_list)
 
@@ -169,11 +196,17 @@ def setup_commands(parser):
     subcmd.add_argument('file_name', type=str)
     subcmd.set_defaults(func=file_delete)
 
+    subcmd = subp.add_parser('show')
+    subcmd.add_argument('dataset_name', type=str)
+    subcmd.add_argument('file_name', type=str) 
+    subcmd.set_defaults(func=file_show)
+
     #file metadata
     metadata = subp.add_parser('metadata')
     metadata_ops = metadata.add_subparsers()
 
     subcmd = metadata_ops.add_parser('list')
+    subcmd.add_argument('--json', action='store_true')
     subcmd.add_argument('dataset_name', type=str)
     subcmd.add_argument('file_name', type=str)
     subcmd.set_defaults(func=file_metadata_list)
