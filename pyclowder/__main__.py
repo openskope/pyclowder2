@@ -5,7 +5,7 @@ import json
 import requests
 import sys
 from pprint import pprint
-from pyclowder.clowder import Clowder
+from clowder import Clowder
 
 
 def dataset_list(args, clowder):
