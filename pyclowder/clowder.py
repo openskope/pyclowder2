@@ -122,7 +122,7 @@ class Clowder(object):
         if name in dataname_list:
             logger.warning("dataset already exists")
             dataset_id = self.get_dataset_id(name)
-            return dataset_id 
+            return {'id':dataset_id} 
         if filenames:
             pass
         else:
