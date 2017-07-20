@@ -1,6 +1,7 @@
 import os
 import requests
 import sys
+import logging
 from datasets import get_file_list
 
 
@@ -68,6 +69,8 @@ class Clowder(object):
 
     def get_dataset_id(self, dataset_name):
 
+        #TODO:In here are we going to assume that 
+        #there will be no repeated names?
         dataset_list = self._get('datasets').json()
         for dataset in dataset_list:
             if dataset['name']==dataset_name:
@@ -113,16 +116,15 @@ class Clowder(object):
         if spaceid:
             payload['spaceid'] = spaceid
     
-        # TODO
         dataset_list = self.list_datasets()
         dataname_list = [dataset['name'] for dataset in dataset_list]
+        logger = logging.getLogger(__name__)
         if name in dataname_list:
-            sys.stderr.write('Dataset name already existed.\n')
-            return
-
+            logger.warning("dataset already exists")
+            dataset_id = self.get_dataset_id(name)
+            return dataset_id 
         if filenames:
             pass
-    
         else:
             return self._post('datasets/createempty', payload).json()
 
