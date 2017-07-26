@@ -1,19 +1,27 @@
 import os
-import requests
-import sys
-import logging
+import requests 
+import sys 
+import logging 
 from datasets import get_file_list
+from urllib3.filepost import encode_multipart_formdata
 
 
 class Clowder(object):
 
+    #TODO:I need to know the exact format of whitelist
+    #TODO:I am now just assuming that it is a string seperated by ,
     def __init__(self, url=None, auth=None, verify=True):
 
         self.url = url if url else os.environ.get('CLOWDER_URL','')
         self.auth = auth if auth else self._auth()
         self.verify = verify
-
-
+        whitelist = os.environ.get('WHITELIST')
+        if whitelist == None:
+            self.whitelist = []
+        else:
+            self.whitelist = whitelist.split(',')
+        
+        
     def _auth(self):
     
         login = os.environ.get('CLOWDER_LOGIN', '')
@@ -35,14 +43,15 @@ class Clowder(object):
         return r
     
     
-    def _post(self, endpoint, data, files=None):
+    #TODO: test the post functions for bugs
+    def _post(self, endpoint, data, files=None, **kwargs):
     
         if files:
             r = requests.post(self._api(endpoint), auth=self.auth,
-                files=files, verify=self.verify)
+                files=files, verify=self.verify, **kwargs)
         else:
             r = requests.post(self._api(endpoint), auth=self.auth,
-                json=data, verify=self.verify)
+                json=data, verify=self.verify, **kwargs)
 
         r.raise_for_status()
     
@@ -69,8 +78,6 @@ class Clowder(object):
 
     def get_dataset_id(self, dataset_name):
 
-        #TODO:In here are we going to assume that 
-        #there will be no repeated names?
         dataset_list = self._get('datasets').json()
         for dataset in dataset_list:
             if dataset['name']==dataset_name:
@@ -209,16 +216,62 @@ class Clowder(object):
 
         dataset_id = self.get_dataset_id(dataset_name)
         file_list = self._get('datasets/{}/listFiles'.format(dataset_id))
-        
         return file_list.json()
 
 
-    def add_file(self, dataset_name, file_path):
+    def add_file(self, dataset_name, file_path, check_duplicate=False):
 
+        logger = logging.getLogger(__name__)
+
+        if check_duplicate:
+            ds_files = self.list_file(dataset_name) 
+            for f in ds_files:
+                if f['filename'] == os.path.basename(file_path):
+                    logger.debug("found %s in dataset %s; not re-uploading" % (f['filename'], datasetid))
+                    return
+
+        if os.path.exists(file_path):
+            for white_listed_local_server_path in self.whitelist:
+                if file_path.startswith(white_listed_local_server_path):
+                    return self._add_file_local(dataset_name, file_path)
+            return self._add_file_clowder(dataset_name, file_path)
+        else:
+            logger.error("unable to upload file %s (not found)", file_path)
+            raise RuntimeError("Not a valid file path") 
+
+            
+    def _add_file_clowder(self, dataset_name, file_path):
+        '''
+        Add file to existing clowder dataset, uploading the actual file bytes
+        '''
+        logger = logging.getLogger(__name__)
         data = {'name': file_path}
         dataset_id = self.get_dataset_id(dataset_name)
         files = {'File': open(file_path, 'rb')}
-        r = self._post('uploadToDataset/{}'.format(dataset_id), data, files)
+        result = self._post('uploadToDataset/{}'.format(dataset_id), data, files)
+        uploadedfileid = result.json()['id']
+        logger.debug("uploaded file id = [%s]", uploadedfileid)
+        return result 
+
+
+    def _add_file_local(self, dataset_name, file_path):
+        '''
+        upload file pointer to existing clowder dataset. Does not copy actual file bytes 
+        '''
+        logger = logging.getLogger(__name__)
+        #No replace anymore since we have an exact mapping between remote and local file
+        # for source_path in self.mounted_paths:
+            # if file_path.startwith(self.mounted_paths[source_path]):
+                # file_path = file_path.replace(self.mounted_pathss[source_path],
+                                            # source_path)
+                # break
+        (content, header) = encode_multipart_formdata([
+            ("file", '{"path":"%s"}' % file_path)
+        ])
+        result = self._post('uploadToDataset/{}'.format(dataset_id), data=content, headers={'Content-Type': header})
+        uploadedfileid = result.json()['id']
+        logger.debug("uploaded file id = [%s]", uploadedfileid)
+        return result 
 
 
     def delete_file(self, dataset_name, file_name):
