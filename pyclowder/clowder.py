@@ -15,11 +15,11 @@ class Clowder(object):
         self.url = url if url else os.environ.get('CLOWDER_URL','')
         self.auth = auth if auth else self._auth()
         self.verify = verify
-        whitelist = os.environ.get('WHITELIST')
+        whitelist = os.environ.get('CLOWDER_WHITELIST')
         if whitelist == None:
             self.whitelist = []
         else:
-            self.whitelist = whitelist.split(',')
+            self.whitelist = whitelist.split(':')
         
         
     def _auth(self):
@@ -44,14 +44,14 @@ class Clowder(object):
     
     
     #TODO: test the post functions for bugs
-    def _post(self, endpoint, data, files=None, **kwargs):
+    def _post(self, endpoint, data=None, json=None, files=None, **kwargs):
     
         if files:
             r = requests.post(self._api(endpoint), auth=self.auth,
                 files=files, verify=self.verify, **kwargs)
         else:
             r = requests.post(self._api(endpoint), auth=self.auth,
-                json=data, verify=self.verify, **kwargs)
+                json=json, data=data, verify=self.verify, **kwargs)
 
         r.raise_for_status()
     
@@ -133,7 +133,7 @@ class Clowder(object):
         if filenames:
             pass
         else:
-            return self._post('datasets/createempty', payload).json()
+            return self._post('datasets/createempty', json=payload).json()
 
 
     def delete_dataset(self, dataset):
@@ -199,7 +199,7 @@ class Clowder(object):
         metadata['agent']['user_id'] = self.get_user_id(dataset_name)
 
         r = self._post('datasets/{}/metadata.jsonld'.format(dataset_id),
-                   metadata)
+                   json=metadata)
         print('uploaded')
 
 
@@ -230,6 +230,8 @@ class Clowder(object):
                     logger.debug("found %s in dataset %s; not re-uploading" % (f['filename'], datasetid))
                     return
 
+        #Debug usage, let's see if the normal one works
+        #And the normal one works,
         if os.path.exists(file_path):
             for white_listed_local_server_path in self.whitelist:
                 if file_path.startswith(white_listed_local_server_path):
@@ -248,7 +250,7 @@ class Clowder(object):
         data = {'name': file_path}
         dataset_id = self.get_dataset_id(dataset_name)
         files = {'File': open(file_path, 'rb')}
-        result = self._post('uploadToDataset/{}'.format(dataset_id), data, files)
+        result = self._post('uploadToDataset/{}'.format(dataset_id), data, files=files)
         uploadedfileid = result.json()['id']
         logger.debug("uploaded file id = [%s]", uploadedfileid)
         return result 
@@ -259,18 +261,13 @@ class Clowder(object):
         upload file pointer to existing clowder dataset. Does not copy actual file bytes 
         '''
         logger = logging.getLogger(__name__)
-        #No replace anymore since we have an exact mapping between remote and local file
-        # for source_path in self.mounted_paths:
-            # if file_path.startwith(self.mounted_paths[source_path]):
-                # file_path = file_path.replace(self.mounted_pathss[source_path],
-                                            # source_path)
-                # break
+        dataset_id = self.get_dataset_id(dataset_name)
         (content, header) = encode_multipart_formdata([
             ("file", '{"path":"%s"}' % file_path)
         ])
         result = self._post('uploadToDataset/{}'.format(dataset_id), data=content, headers={'Content-Type': header})
         uploadedfileid = result.json()['id']
-        logger.debug("uploaded file id = [%s]", uploadedfileid)
+        logger.debug("local uploaded file id = [%s]", uploadedfileid)
         return result 
 
 
