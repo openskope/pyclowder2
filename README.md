@@ -1,6 +1,11 @@
 This repository contains the next generation of pyClowder. This library makes it easier to interact with clowder and
 to create extractors.
 
+# Clowder SDK
+
+A new Clowder class has been created to simplify the interaction with the Clowder API. The Clowder class is especially useful software running outside the infrastructure where applications may not have access to RabbitMQ, etc.
+
+
 # Extractor creation
 
 One of the most interesting aspects of Clowder is the ability to extract metadata from any file. This ability is
