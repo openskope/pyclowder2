@@ -3,7 +3,9 @@ to create extractors.
 
 # Clowder SDK
 
-A new Clowder class has been created to simplify the interaction with the Clowder API. The Clowder class is especially useful software running outside the infrastructure where applications may not have access to RabbitMQ, etc.
+A new Clowder class has been created to simplify the interaction with the Clowder API. The Clowder class is especially useful
+software running outside the infrastructure where applications may only have access to the API and no access to RabbitMQ.
+
 
 
 # Extractor creation
