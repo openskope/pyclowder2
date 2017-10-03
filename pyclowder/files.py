@@ -263,6 +263,7 @@ def upload_to_dataset(connector, host, key, datasetid, filepath, check_duplicate
         logger.error("unable to upload file %s (not found)", filepath)
 
 
+
 def _upload_to_dataset_local(connector, host, key, datasetid, filepath):
     """Upload file POINTER to existing Clowder dataset. Does not copy actual file bytes.
 
