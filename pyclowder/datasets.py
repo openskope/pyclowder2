@@ -7,9 +7,30 @@ import logging
 import os
 import tempfile
 import requests
-from pyclowder.utils import StatusMessage
+
+from .base import ClowderBase
 
 
+class Datasets(ClowderBase):
+
+    def __init__(self, session, baseurl):
+        super(Datasets, self).__init__(session, baseurl)
+
+    def list(self, limit=12):
+        return self._get('datasets', params=dict(limit=limit))
+
+    def get(self, dataset_id):
+        return self._get('datasets/%s' % dataset_id)
+
+    def get_files(self, dataset_id):
+        return self._get('datasets/%s/files' % dataset_id)
+
+    def new(self, name, description, parentid=None, spaceid=None):
+        return self._post('datasets', json=dict(name=name, description=description,
+                          collection=parentid, spaceid=spaceid))
+
+    
+    
 def create_empty(connector, host, key, datasetname, description, parentid=None, spaceid=None):
     """Create a new dataset in Clowder.
 
