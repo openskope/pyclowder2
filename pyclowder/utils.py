@@ -13,6 +13,7 @@ import os
 import time
 import zipfile
 import tempfile
+import shutil
 import requests
 
 from enum import Enum
@@ -130,3 +131,12 @@ def extract_zip_contents(zipfilepath):
             file_list.append(os.path.join(root, currfile))
 
     return file_list
+
+# TODO Add support for temporary filename?
+def download_fiile(response, filename=None):
+    """Copy a streamed response to a local file."""
+
+    with open(filename, 'wb') as f:
+        shutil.copyfileobj(response.raw, f)
+
+    return filename

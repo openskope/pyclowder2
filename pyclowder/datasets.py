@@ -2,15 +2,12 @@
 
 This module provides simple wrappers around the clowder Datasets API
 """
-import json
-import logging
-import os
-import tempfile
-import requests
-
 from .base import ClowderBase
+from .utils import download_file
 
 
+# TODO: should point to Clowder instance instead of using base class?
+# Remember to use weakref if this change is made.
 class Datasets(ClowderBase):
 
     def __init__(self, session, baseurl):
@@ -23,13 +20,48 @@ class Datasets(ClowderBase):
         return self._get('datasets/%s' % dataset_id)
 
     def get_files(self, dataset_id):
-        return self._get('datasets/%s/files' % dataset_id)
+        return self._get('datasets/%s/listFiles' % dataset_id)
 
+    def get_metadata(self, dataset_id, extractor=None):
+        return self._get('datasets/%s/metadata' % dataset_id, 
+                         params=dict(extractor=extractor))
+
+    # TODO: can post and clowder service handle None values in data?
+    # If not, create new dict type that silently removes them.
     def new(self, name, description, parentid=None, spaceid=None):
-        return self._post('datasets', json=dict(name=name, description=description,
-                          collection=parentid, spaceid=spaceid))
+        return self._post('datasets', data=dict(name=name, 
+                          description=description, collection=parentid, 
+                          spaceid=spaceid))
 
+    def new_metadata(self, dataset_id, metadata):
+        return self._post('datasets/%s/metadata.jsonld' % dataset_id, 
+                          data=dict(metadata=metadata))
+
+    # submit_extractions
+    def new_extractions(self, dataset_id, extractor=None):
+        return self._post('datasets/%s/extractions' % dataset_id,
+                          data=dict(extractor=extractor))
+
+    def delete(self, dataset_id):
+        self._delete('datasets/%s' % dataset_id)
+
+    def delete_metadata(self, dataset_id, extractor=None):
+        self._delete('datasets/%s/metadata' %s dataset_id, 
+                            data=dict(extractor=extractor))
     
+    def download(self, dataset_id, filename=None):
+        result = self._get('datasets/%s/download' % dataset_id, stream=True)
+        return download_file(result, filename)
+
+
+### Deprecated #####
+
+import json
+import logging
+import os
+import tempfile
+import requests
+
     
 def create_empty(connector, host, key, datasetname, description, parentid=None, spaceid=None):
     """Create a new dataset in Clowder.

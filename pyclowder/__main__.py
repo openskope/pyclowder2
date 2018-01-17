@@ -128,14 +128,14 @@ def file_metadata_delete(args, clowder):
 def setup_commands(parser):
 
     parser.add_argument('--clowder-url', dest='url',
-            default=os.environ.get('CLOWDER_HOST', ''),
-            help='URL of Clowder host (Env: CLOWDER_URL)')
+            default=os.environ.get('CLOWDER_URL', ''),
+            help='base Clowder URL (default=$CLOWDER_URL)')
     parser.add_argument('--clowder-login', dest='login',
             default=os.environ.get('CLOWDER_LOGIN', ''),
-            help='Clowder login (Env: CLOWDER_LOGIN)')
+            help='Clowder login (default=$CLOWDER_LOGIN)')
     parser.add_argument('--clowder-password', dest='password',
             default=os.environ.get('CLOWDER_PASSWORD', ''),
-            help='Clowder password (Env: CLOWDER_PASSWORD)')
+            help='Clowder password (default=$CLOWDER_PASSWORD)')
     subparsers = parser.add_subparsers()
 
     #datasets
@@ -227,12 +227,18 @@ def args_operation(args, clowder):
 
     try:
         args.func(args, clowder)
+
+    except requests.exceptions.ConnectionError as e:
+        sys.stderr.write('Error connecting to Clowder service. Check URL, login, '
+                         'and password.\n')
+        sys.exit(1)
+
     except requests.exceptions.HTTPError as e:
         status = e.response.status_code
         if status==401:
-            sys.stderr.write('Operation not authorized. Your username' +
-                              ' or password might be wrong or you have' +
-                              ' no right on the file.\n')
+            sys.stderr.write('Operation not authorized. Your login or password might '
+                             'wrong or you may not have permissions.\n')
+        sys.exit(1)
 
 
 def main():
@@ -241,7 +247,7 @@ def main():
     setup_commands(parser) 
     args = parser.parse_args()
 
-    clowder = Clowder(url=args.url, auth=(args.login, args.password))
+    clowder = Clowder(url=args.url, login=args.login, password=args.password)
     args_operation(args, clowder)
 
         
